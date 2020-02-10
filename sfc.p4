@@ -6,7 +6,7 @@ const bit<16> TYPE_SFC = 0x1212; // Define TYPE for SFC
 const bit<8> TYPE_TCP = 0x06;
 const bit<8> TYPE_UDP = 0x11;
 const bit<16> TYPE_IPV4 = 0x800;
-const bit<8> TYPE_TUNNEL = 0x1;
+const bit<16> TYPE_NSH = 0x894F;
 
 /*************************************************************************
 *********************** H E A D E R S  ***********************************
@@ -84,7 +84,6 @@ struct metadata {
 
 struct headers {
     ethernet_t ethernet;
-    tunnel_t tunnel;
     sfc_t sfc;
     ipv4_t ipv4;
     tcp_t tcp;
@@ -107,15 +106,10 @@ parser MyParser(packet_in packet,
     state parse_ethernet {
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
-            TYPE_SFC: parse_tunnel;
+            TYPE_NSH: parse_sfc;
             TYPE_IPV4: parse_ipv4;
             default: accept;
         }
-    }
-    state parse_tunnel {
-        packet.extract(hdr.tunnel);
-        transition parse_sfc;
-
     }
     state parse_sfc {
         packet.extract(hdr.sfc);
@@ -183,7 +177,6 @@ control MyIngress(inout headers hdr,
     action sfc_decapsulation() {
            hdr.ethernet.etherType = TYPE_IPV4;
            hdr.ipv4.dscp = 0;
-           hdr.tunnel.setInvalid();
            hdr.sfc.setInvalid();
     }
     table sfc_termination {
@@ -198,7 +191,7 @@ control MyIngress(inout headers hdr,
         default_action = NoAction();
     }
     action sfc_encapsulation(bit<24> SPI) {
-        hdr.ethernet.etherType = TYPE_SFC;
+        hdr.ethernet.etherType = TYPE_NSH;
         hdr.sfc.setValid();
         hdr.sfc.ver = 0x1; //0x1 RFC8300
         hdr.sfc.zerobit = 0;
@@ -207,12 +200,9 @@ control MyIngress(inout headers hdr,
         hdr.sfc.len = 0x6;
         hdr.sfc.u2 = 0;
         hdr.sfc.MDtype = 0x1; // Fixed sized
-        hdr.sfc.protocol = 0x3; // 0x3: Ethernet
+        hdr.sfc.protocol = 0x1; // 0x1:  IPv4
         hdr.sfc.SPI = SPI;
         hdr.sfc.SI = 255;
-        hdr.tunnel.setValid();
-        hdr.tunnel.NxpHp_id = 0;
-        hdr.tunnel.dst_id = 0;
     }
     table sfc_classifier {
         key = {
@@ -226,32 +216,17 @@ control MyIngress(inout headers hdr,
         default_action = NoAction();
     }
 
-    action sfc_set_dst_id(tunnelAddr_t dst_id,tunnelAddr_t NxpHp_id) {
-        hdr.tunnel.dst_id = dst_id; // You should go to dst_id
-        hdr.tunnel.NxpHp_id = NxpHp_id;
-    }
-    table sfc_next {
-        key = {
-            hdr.sfc.SPI: exact;
-            hdr.sfc.SI: exact;
-        }
-        actions = {
-            sfc_set_dst_id;
-            drop;
-        }
-        size = 1024;
-        default_action = drop();
-    }
-
     action sfc_forward(macAddr_t dstAddr, egressSpec_t port) {
         standard_metadata.egress_spec = port;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = dstAddr;
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
     }
+
     table sfc_egress {
         key = {
-            hdr.tunnel.dst_id: exact;
+            hdr.sfc.SPI: exact;
+            hdr.sfc.SI: exact;
         }
         actions = {
             sfc_forward;
@@ -263,7 +238,6 @@ control MyIngress(inout headers hdr,
 
 
     apply {
-
         if (hdr.ipv4.isValid() && hdr.ipv4.dscp == 0) {   // Process only non-SFC packets
             ipv4_lpm.apply();
         }
@@ -273,14 +247,11 @@ control MyIngress(inout headers hdr,
             }
             else{
                 hdr.sfc.ttl = hdr.sfc.ttl - 1;
-                if (hdr.tunnel.dst_id == hdr.tunnel.NxpHp_id){
-                    hdr.sfc.SI = hdr.sfc.SI - 1;
-                }
+                hdr.sfc.SI = hdr.sfc.SI - 1;
             }
             if (hdr.sfc.SI == 0 || hdr.sfc.ttl == 0){
                 drop();
             }
-            sfc_next.apply();
             sfc_egress.apply();
             sfc_termination.apply();
         }
@@ -328,7 +299,6 @@ control MyComputeChecksum(inout headers  hdr, inout metadata meta) {
 control MyDeparser(packet_out packet, in headers hdr) {
     apply {
         packet.emit(hdr.ethernet);
-        packet.emit(hdr.tunnel);
         packet.emit(hdr.sfc);
         packet.emit(hdr.ipv4);
         packet.emit(hdr.tcp);
