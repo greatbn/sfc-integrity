@@ -53,33 +53,10 @@
       }
     },
     {
-      "table": "MyIngress.sfc_next",
+      "table": "MyIngress.sfc_egress",
       "match": {
         "hdr.sfc.SPI": 1,
         "hdr.sfc.SI": 255
-      },
-      "action_name": "MyIngress.sfc_set_dst_id",
-      "action_params": {
-        "dst_id": 0,
-        "NxpHp_id": 0
-      }
-    },
-    {
-      "table": "MyIngress.sfc_next",
-      "match": {
-        "hdr.sfc.SPI": 1,
-        "hdr.sfc.SI": 254
-      },
-      "action_name": "MyIngress.sfc_set_dst_id",
-      "action_params": {
-        "dst_id": 1,
-        "NxpHp_id": 1
-      }
-    },
-    {
-      "table": "MyIngress.sfc_egress",
-      "match": {
-        "hdr.tunnel.dst_id": 0
       },
       "action_name": "MyIngress.sfc_forward",
       "action_params": {
@@ -90,7 +67,32 @@
     {
       "table": "MyIngress.sfc_egress",
       "match": {
-        "hdr.tunnel.dst_id": 1
+        "hdr.sfc.SPI": 1,
+        "hdr.sfc.SI": 254
+      },
+      "action_name": "MyIngress.sfc_forward",
+      "action_params": {
+        "dstAddr": "00:00:00:00:02:02",
+        "port": 1
+      }
+    },
+    {
+      "table": "MyIngress.sfc_egress",
+      "match": {
+        "hdr.sfc.SPI": 1,
+        "hdr.sfc.SI": 252
+      },
+      "action_name": "MyIngress.sfc_forward",
+      "action_params": {
+        "dstAddr": "00:00:00:00:03:03",
+        "port": 3
+      }
+    },
+    {
+      "table": "MyIngress.sfc_egress",
+      "match": {
+        "hdr.sfc.SPI": 1,
+        "hdr.sfc.SI": 251
       },
       "action_name": "MyIngress.sfc_forward",
       "action_params": {

@@ -230,6 +230,7 @@ control MyIngress(inout headers hdr,
         }
         actions = {
             sfc_forward;
+            NoAction;
             drop;
         }
         size = 1024;

@@ -62,26 +62,15 @@
       }
     },
     {
-      "table": "MyIngress.sfc_next",
+      "table": "MyIngress.sfc_egress",
       "match": {
         "hdr.sfc.SPI": 1,
         "hdr.sfc.SI": 255
       },
-      "action_name": "MyIngress.sfc_set_dst_id",
-      "action_params": {
-        "dst_id": 2,
-        "NxpHp_id": 2
-      }
-    },
-    {
-      "table": "MyIngress.sfc_egress",
-      "match": {
-        "hdr.tunnel.dst_id": 2
-      },
       "action_name": "MyIngress.sfc_forward",
       "action_params": {
-        "dstAddr": "00:00:00:00:03:03",
-        "port": 1
+        "dstAddr": "00:00:00:00:02:02",
+        "port": 2
       }
     }
 	]
